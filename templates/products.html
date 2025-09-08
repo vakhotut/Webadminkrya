@@ -38,7 +38,7 @@
         <div class="tab-content" id="productsTabContent">
             <!-- Вкладка каталога -->
             <div class="tab-pane fade show active" id="catalog" role="tabpanel">
-                {% if products.length === 0 and not error %}
+                {% if products|length == 0 and not error %}
                 <div class="alert alert-info mt-3" role="alert">
                     Товары не найдены. Добавьте первый товар.
                 </div>
@@ -309,4 +309,4 @@
         });
     </script>
 </body>
-</html>
+                        </html>
