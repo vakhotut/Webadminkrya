@@ -326,7 +326,7 @@ async def transactions_list(request):
         async with db_pool.acquire() as conn:
             # Проверяем существование таблицы transactions
             table_exists = await conn.fetchval(
-                "SELECT EXISTS (SELECT FROM information_schema.templates WHERE table_name = 'transactions')"
+                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'transactions')"
             )
             
             if not table_exists:
@@ -421,7 +421,7 @@ async def products_list(request):
                 LEFT JOIN categories cat ON p.category_id = cat.id
                 LEFT JOIN districts d ON p.district_id = d.id
                 LEFT JOIN delivery_types dt ON p.delivery_type_id = dt.id
-                ORDER BY p.created_at DESC 
+                ORDER BY p.id DESC  -- Исправлено: было p.created_at DESC
                 LIMIT $1 OFFSET $2
             ''', per_page, offset)
             
@@ -597,7 +597,7 @@ async def bot_management(request):
                     'error': 'Таблицы бота не созданы. Запустите сначала основного бота.',
                     'texts': [],
                     'languages': [],
-                    'cities': [],
+                    'c cities': [],
                     'districts': [],
                     'products': [],
                     'delivery_types': []
@@ -726,7 +726,7 @@ async def add_city(request):
         logger.error(f"Error in add_city: {e}")
         return web.HTTPFound('/admin/bot-management?error=1#cities')
 
-@routes.post('/admin/bot/cities/delete/{city_id}')
+@routes.post('/admin/bot/cities/delete/{city_id')
 async def delete_city(request):
     city_id = int(request.match_info['city_id'])
     db_pool = request.app['db_pool']
