@@ -4,7 +4,7 @@ from aiohttp import web
 import aiohttp_jinja2
 import jinja2
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncpg
 from dotenv import load_dotenv
 import ssl
@@ -89,7 +89,7 @@ async def login(request):
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
         token = jwt.encode({
             'username': username,
-            'exp': datetime.utcnow() + timedelta(hours=24)
+            'exp': datetime.now(timezone.utc) + timedelta(hours=24)
         }, JWT_SECRET, algorithm='HS256')
         
         response = web.HTTPFound('/admin/dashboard')
@@ -159,12 +159,12 @@ async def dashboard(request):
             LIMIT 10
         ''')
         
-        # Активные пользователи
+        # Активные пользователи (используем created_at вместо last_purchase)
         active_users = await conn.fetch('''
-            SELECT user_id, username, first_name, last_purchase,
-                   purchase_count, balance, created_at
+            SELECT user_id, username, first_name, created_at,
+                   purchase_count, balance
             FROM users 
-            ORDER BY last_purchase DESC NULLS LAST
+            ORDER BY created_at DESC
             LIMIT 10
         ''')
     
