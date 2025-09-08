@@ -9,6 +9,7 @@ import asyncpg
 from dotenv import load_dotenv
 import ssl
 import asyncio
+import uuid
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -61,6 +62,37 @@ async def init_db(app):
             max_size=10
         )
         logger.info("Database connection established successfully")
+        
+        # Создаем таблицы для управления товарами
+        async with app['db_pool'].acquire() as conn:
+            # Таблица категорий товаров
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS categories (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT UNIQUE NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Таблица товаров с расширенными полями
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS products (
+                    id SERIAL PRIMARY KEY,
+                    uuid TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    price REAL NOT NULL,
+                    image_url TEXT,
+                    category_id INTEGER REFERENCES categories(id),
+                    city_id INTEGER REFERENCES cities(id),
+                    district_id INTEGER REFERENCES districts(id),
+                    delivery_type_id INTEGER REFERENCES delivery_types(id),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+        logger.info("Product management tables created successfully")
     except Exception as e:
         logger.error(f"Error connecting to database: {e}")
         raise
@@ -275,6 +307,128 @@ async def cancel_transaction(request):
     
     return web.HTTPFound('/admin/transactions')
 
+# Новые маршруты для управления товарами
+@routes.get('/admin/products')
+@aiohttp_jinja2.template('products.html')
+async def products_list(request):
+    db_pool = request.app['db_pool']
+    page = int(request.query.get('page', 1))
+    per_page = 20
+    offset = (page - 1) * per_page
+    
+    async with db_pool.acquire() as conn:
+        products = await conn.fetch('''
+            SELECT p.*, c.name as city_name, cat.name as category_name,
+                   d.name as district_name, dt.name as delivery_type_name
+            FROM products p
+            LEFT JOIN cities c ON p.city_id = c.id
+            LEFT JOIN categories cat ON p.category_id = cat.id
+            LEFT JOIN districts d ON p.district_id = d.id
+            LEFT JOIN delivery_types dt ON p.delivery_type_id = dt.id
+            ORDER BY p.created_at DESC 
+            LIMIT $1 OFFSET $2
+        ''', per_page, offset)
+        
+        total_products = await conn.fetchval('SELECT COUNT(*) FROM products')
+        cities = await conn.fetch('SELECT * FROM cities ORDER BY name')
+        categories = await conn.fetch('SELECT * FROM categories ORDER BY name')
+        districts = await conn.fetch('SELECT * FROM districts ORDER BY name')
+        delivery_types = await conn.fetch('SELECT * FROM delivery_types ORDER BY name')
+    
+    return {
+        'products': products,
+        'cities': cities,
+        'categories': categories,
+        'districts': districts,
+        'delivery_types': delivery_types,
+        'page': page,
+        'total_pages': (total_products + per_page - 1) // per_page
+    }
+
+@routes.post('/admin/products/add')
+async def add_product(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    # Генерируем уникальный идентификатор товара
+    product_uuid = str(uuid.uuid4())
+    
+    async with db_pool.acquire() as conn:
+        # Если выбрана новая категория, создаем ее
+        if data['category_id'] == 'new':
+            category_id = await conn.fetchval(
+                'INSERT INTO categories (name) VALUES ($1) RETURNING id',
+                data['new_category']
+            )
+        else:
+            category_id = int(data['category_id'])
+        
+        # Если выбран новый город, создаем его
+        if data['city_id'] == 'new':
+            city_id = await conn.fetchval(
+                'INSERT INTO cities (name) VALUES ($1) RETURNING id',
+                data['new_city']
+            )
+        else:
+            city_id = int(data['city_id'])
+        
+        # Если выбран новый район, создаем его
+        if data['district_id'] == 'new':
+            district_id = await conn.fetchval(
+                'INSERT INTO districts (name, city_id) VALUES ($1, $2) RETURNING id',
+                data['new_district'], city_id
+            )
+        else:
+            district_id = int(data['district_id'])
+        
+        # Если выбран новый тип доставки, создаем его
+        if data['delivery_type_id'] == 'new':
+            delivery_type_id = await conn.fetchval(
+                'INSERT INTO delivery_types (name) VALUES ($1) RETURNING id',
+                data['new_delivery_type']
+            )
+        else:
+            delivery_type_id = int(data['delivery_type_id'])
+        
+        # Добавляем товар
+        await conn.execute('''
+            INSERT INTO products 
+            (uuid, name, description, price, image_url, category_id, city_id, district_id, delivery_type_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ''', product_uuid, data['name'], data['description'], float(data['price']), 
+           data['image_url'], category_id, city_id, district_id, delivery_type_id)
+    
+    return web.HTTPFound('/admin/products')
+
+@routes.post('/admin/products/update/{product_id}')
+async def update_product(request):
+    product_id = int(request.match_info['product_id'])
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute('''
+            UPDATE products 
+            SET name = $1, description = $2, price = $3, image_url = $4,
+                category_id = $5, city_id = $6, district_id = $7, delivery_type_id = $8,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = $9
+        ''', data['name'], data['description'], float(data['price']), data['image_url'],
+           int(data['category_id']), int(data['city_id']), int(data['district_id']), 
+           int(data['delivery_type_id']), product_id)
+    
+    return web.HTTPFound('/admin/products')
+
+@routes.post('/admin/products/delete/{product_id}')
+async def delete_product(request):
+    product_id = int(request.match_info['product_id'])
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute('DELETE FROM products WHERE id = $1', product_id)
+    
+    return web.HTTPFound('/admin/products')
+
 # Новые маршруты для управления ботом
 @routes.get('/admin/bot-management')
 @aiohttp_jinja2.template('bot_management.html')
@@ -421,7 +575,7 @@ async def delete_district(request):
     return web.HTTPFound('/admin/bot-management#districts')
 
 @routes.post('/admin/bot/products/update')
-async def update_product(request):
+async def update_product_bot(request):
     data = await request.post()
     db_pool = request.app['db_pool']
     
@@ -434,7 +588,7 @@ async def update_product(request):
     return web.HTTPFound('/admin/bot-management#products')
 
 @routes.post('/admin/bot/products/add')
-async def add_product(request):
+async def add_product_bot(request):
     data = await request.post()
     db_pool = request.app['db_pool']
     
@@ -447,7 +601,7 @@ async def add_product(request):
     return web.HTTPFound('/admin/bot-management#products')
 
 @routes.post('/admin/bot/products/delete/{product_id}')
-async def delete_product(request):
+async def delete_product_bot(request):
     product_id = int(request.match_info['product_id'])
     db_pool = request.app['db_pool']
     
