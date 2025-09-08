@@ -14,7 +14,7 @@
             <div class="card shadow">
                 <div class="card-body">
                     <h3 class="card-title text-center mb-4">Admin Login</h3>
-                    {% if request.query.get('error') %}
+                    {% if error %}
                     <div class="alert alert-danger">Invalid credentials</div>
                     {% endif %}
                     <form method="post">
