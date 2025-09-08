@@ -7,6 +7,8 @@ import jwt
 from datetime import datetime, timedelta
 import asyncpg
 from dotenv import load_dotenv
+import ssl
+import asyncio
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -45,10 +47,28 @@ async def auth_middleware(request, handler):
     return await handler(request)
 
 async def init_db(app):
-    app['db_pool'] = await asyncpg.create_pool(DATABASE_URL)
+    try:
+        # Для Render нам нужно использовать SSL соединение
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        # Подключаемся к базе данных
+        app['db_pool'] = await asyncpg.create_pool(
+            DATABASE_URL,
+            ssl=ssl_context,
+            min_size=1,
+            max_size=10
+        )
+        logger.info("Database connection established successfully")
+    except Exception as e:
+        logger.error(f"Error connecting to database: {e}")
+        raise
 
 async def close_db(app):
-    await app['db_pool'].close()
+    if 'db_pool' in app:
+        await app['db_pool'].close()
+        logger.info("Database connection closed")
 
 @routes.get('/admin')
 async def admin_redirect(request):
@@ -57,7 +77,8 @@ async def admin_redirect(request):
 @routes.get('/admin/login')
 @aiohttp_jinja2.template('login.html')
 async def login_form(request):
-    return {}
+    error = request.query.get('error')
+    return {'error': error}
 
 @routes.post('/admin/login')
 async def login(request):
@@ -103,15 +124,21 @@ async def dashboard(request):
             datetime.now().date()
         )
         
+        # Статистика транзакций
+        total_transactions = await conn.fetchval('SELECT COUNT(*) FROM transactions')
+        pending_transactions = await conn.fetchval(
+            'SELECT COUNT(*) FROM transactions WHERE status = $1',
+            'pending'
+        )
+        
         # Общая выручка
         total_revenue = await conn.fetchval(
-            'SELECT COALESCE(SUM(price), 0) FROM purchases WHERE status = $1', 
-            'completed'
+            'SELECT COALESCE(SUM(price), 0) FROM purchases'
         )
         
         today_revenue = await conn.fetchval(
-            'SELECT COALESCE(SUM(price), 0) FROM purchases WHERE status = $1 AND purchase_time >= $2',
-            'completed', datetime.now().date()
+            'SELECT COALESCE(SUM(price), 0) FROM purchases WHERE purchase_time >= $1',
+            datetime.now().date()
         )
         
         # Последние заказы
@@ -123,12 +150,21 @@ async def dashboard(request):
             LIMIT 10
         ''')
         
+        # Последние транзакции
+        recent_transactions = await conn.fetch('''
+            SELECT t.*, u.username, u.first_name 
+            FROM transactions t 
+            LEFT JOIN users u ON t.user_id = u.user_id 
+            ORDER BY t.created_at DESC 
+            LIMIT 10
+        ''')
+        
         # Активные пользователи
         active_users = await conn.fetch('''
             SELECT user_id, username, first_name, last_purchase,
                    purchase_count, balance, created_at
             FROM users 
-            ORDER BY last_purchase DESC 
+            ORDER BY last_purchase DESC NULLS LAST
             LIMIT 10
         ''')
     
@@ -137,9 +173,12 @@ async def dashboard(request):
         'today_users': today_users,
         'total_orders': total_orders,
         'today_orders': today_orders,
+        'total_transactions': total_transactions,
+        'pending_transactions': pending_transactions,
         'total_revenue': total_revenue,
         'today_revenue': today_revenue,
         'recent_orders': recent_orders,
+        'recent_transactions': recent_transactions,
         'active_users': active_users
     }
 
@@ -191,6 +230,51 @@ async def orders_list(request):
         'total_pages': (total_orders + per_page - 1) // per_page
     }
 
+@routes.get('/admin/transactions')
+@aiohttp_jinja2.template('transactions.html')
+async def transactions_list(request):
+    db_pool = request.app['db_pool']
+    page = int(request.query.get('page', 1))
+    per_page = 20
+    offset = (page - 1) * per_page
+    
+    async with db_pool.acquire() as conn:
+        transactions = await conn.fetch('''
+            SELECT t.*, u.username, u.first_name 
+            FROM transactions t 
+            LEFT JOIN users u ON t.user_id = u.user_id 
+            ORDER BY t.created_at DESC 
+            LIMIT $1 OFFSET $2
+        ''', per_page, offset)
+        
+        total_transactions = await conn.fetchval('SELECT COUNT(*) FROM transactions')
+    
+    return {
+        'transactions': transactions,
+        'page': page,
+        'total_pages': (total_transactions + per_page - 1) // per_page
+    }
+
+@routes.post('/admin/transactions/{transaction_id}/cancel')
+async def cancel_transaction(request):
+    transaction_id = int(request.match_info['transaction_id'])
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        transaction = await conn.fetchrow(
+            'SELECT * FROM transactions WHERE id = $1',
+            transaction_id
+        )
+        
+        if transaction and transaction['status'] == 'pending':
+            # Обновляем статус транзакции
+            await conn.execute(
+                'UPDATE transactions SET status = $1 WHERE id = $2',
+                'canceled', transaction_id
+            )
+    
+    return web.HTTPFound('/admin/transactions')
+
 def create_admin_app():
     app = web.Application(middlewares=[auth_middleware])
     
@@ -204,6 +288,11 @@ def create_admin_app():
     return app
 
 async def main():
+    # Проверяем, что DATABASE_URL установлена
+    if not DATABASE_URL:
+        logger.error("DATABASE_URL environment variable is not set")
+        return
+    
     app = create_admin_app()
     runner = web.AppRunner(app)
     await runner.setup()
@@ -217,5 +306,4 @@ async def main():
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
