@@ -726,7 +726,7 @@ async def add_city(request):
         logger.error(f"Error in add_city: {e}")
         return web.HTTPFound('/admin/bot-management?error=1#cities')
 
-@routes.post('/admin/bot/cities/delete/{city_id')
+@routes.post('/admin/bot/cities/delete/{city_id}')
 async def delete_city(request):
     city_id = int(request.match_info['city_id'])
     db_pool = request.app['db_pool']
