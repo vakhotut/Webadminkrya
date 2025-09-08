@@ -1,3 +1,2 @@
 asyncpg==0.29.0
-telegram==20.7
 flask==2.3.3
