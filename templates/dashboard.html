@@ -9,6 +9,12 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="#">Admin Panel</a>
+            <div class="navbar-nav">
+                <a class="nav-link active" href="/admin/dashboard">Dashboard</a>
+                <a class="nav-link" href="/admin/users">Users</a>
+                <a class="nav-link" href="/admin/orders">Orders</a>
+                <a class="nav-link" href="/admin/transactions">Transactions</a>
+            </div>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="/admin/logout">Logout</a>
             </div>
@@ -47,11 +53,9 @@
             <div class="col-md-3">
                 <div class="card text-white bg-warning mb-3">
                     <div class="card-body">
-                        <h5 class="card-title">Quick Actions</h5>
-                        <div class="d-grid gap-2">
-                            <a href="/admin/users" class="btn btn-light btn-sm">Manage Users</a>
-                            <a href="/admin/orders" class="btn btn-light btn-sm">View Orders</a>
-                        </div>
+                        <h5 class="card-title">Transactions</h5>
+                        <h2>{{ total_transactions }}</h2>
+                        <p>Pending: {{ pending_transactions }}</p>
                     </div>
                 </div>
             </div>
@@ -93,6 +97,46 @@
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
+                        <h5>Recent Transactions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Amount</th>
+                                        <th>Currency</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for transaction in recent_transactions %}
+                                    <tr>
+                                        <td>{{ transaction.first_name or transaction.username or transaction.user_id }}</td>
+                                        <td>${{ transaction.amount }}</td>
+                                        <td>{{ transaction.currency }}</td>
+                                        <td>
+                                            <span class="badge bg-{% if transaction.status == 'paid' %}success{% elif transaction.status == 'pending' %}warning{% else %}danger{% endif %}">
+                                                {{ transaction.status }}
+                                            </span>
+                                        </td>
+                                        <td>{{ transaction.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
                         <h5>Active Users</h5>
                     </div>
                     <div class="card-body">
@@ -103,7 +147,7 @@
                                         <th>User</th>
                                         <th>Orders</th>
                                         <th>Balance</th>
-                                        <th>Last Activity</th>
+                                        <th>Registered</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -112,7 +156,7 @@
                                         <td>{{ user.first_name or user.username or user.user_id }}</td>
                                         <td>{{ user.purchase_count }}</td>
                                         <td>${{ user.balance }}</td>
-                                        <td>{{ user.last_purchase.strftime('%Y-%m-%d') if user.last_purchase else 'Never' }}</td>
+                                        <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
