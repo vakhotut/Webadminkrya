@@ -275,6 +275,223 @@ async def cancel_transaction(request):
     
     return web.HTTPFound('/admin/transactions')
 
+# Новые маршруты для управления ботом
+@routes.get('/admin/bot-management')
+@aiohttp_jinja2.template('bot_management.html')
+async def bot_management(request):
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        # Загружаем данные для всех разделов
+        texts = await conn.fetch('SELECT * FROM texts ORDER BY lang, key')
+        languages = await conn.fetch('SELECT DISTINCT lang FROM texts ORDER BY lang')
+        cities = await conn.fetch('SELECT * FROM cities ORDER BY name')
+        
+        districts = await conn.fetch('''
+            SELECT d.*, c.name as city_name 
+            FROM districts d 
+            JOIN cities c ON d.city_id = c.id 
+            ORDER BY c.name, d.name
+        ''')
+        
+        products = await conn.fetch('''
+            SELECT p.*, c.name as city_name 
+            FROM products p 
+            JOIN cities c ON p.city_id = c.id 
+            ORDER BY c.name, p.name
+        ''')
+        
+        delivery_types = await conn.fetch('SELECT * FROM delivery_types ORDER BY name')
+    
+    return {
+        'texts': texts,
+        'languages': [lang['lang'] for lang in languages],
+        'cities': cities,
+        'districts': districts,
+        'products': products,
+        'delivery_types': delivery_types
+    }
+
+@routes.post('/admin/bot/texts/update')
+async def update_text(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'UPDATE texts SET value = $1 WHERE id = $2',
+            data['value'], int(data['id'])
+        )
+    
+    return web.HTTPFound('/admin/bot-management#texts')
+
+@routes.post('/admin/bot/texts/add')
+async def add_text(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'INSERT INTO texts (lang, key, value) VALUES ($1, $2, $3)',
+            data['lang'], data['key'], data['value']
+        )
+    
+    return web.HTTPFound('/admin/bot-management#texts')
+
+@routes.post('/admin/bot/texts/delete/{text_id}')
+async def delete_text(request):
+    text_id = int(request.match_info['text_id'])
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute('DELETE FROM texts WHERE id = $1', text_id)
+    
+    return web.HTTPFound('/admin/bot-management#texts')
+
+@routes.post('/admin/bot/cities/update')
+async def update_city(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'UPDATE cities SET name = $1 WHERE id = $2',
+            data['name'], int(data['id'])
+        )
+    
+    return web.HTTPFound('/admin/bot-management#cities')
+
+@routes.post('/admin/bot/cities/add')
+async def add_city(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'INSERT INTO cities (name) VALUES ($1)',
+            data['name']
+        )
+    
+    return web.HTTPFound('/admin/bot-management#cities')
+
+@routes.post('/admin/bot/cities/delete/{city_id}')
+async def delete_city(request):
+    city_id = int(request.match_info['city_id'])
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute('DELETE FROM cities WHERE id = $1', city_id)
+    
+    return web.HTTPFound('/admin/bot-management#cities')
+
+@routes.post('/admin/bot/districts/update')
+async def update_district(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'UPDATE districts SET name = $1, city_id = $2 WHERE id = $3',
+            data['name'], int(data['city_id']), int(data['id'])
+        )
+    
+    return web.HTTPFound('/admin/bot-management#districts')
+
+@routes.post('/admin/bot/districts/add')
+async def add_district(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'INSERT INTO districts (name, city_id) VALUES ($1, $2)',
+            data['name'], int(data['city_id'])
+        )
+    
+    return web.HTTPFound('/admin/bot-management#districts')
+
+@routes.post('/admin/bot/districts/delete/{district_id}')
+async def delete_district(request):
+    district_id = int(request.match_info['district_id'])
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute('DELETE FROM districts WHERE id = $1', district_id)
+    
+    return web.HTTPFound('/admin/bot-management#districts')
+
+@routes.post('/admin/bot/products/update')
+async def update_product(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'UPDATE products SET name = $1, price = $2, image_url = $3, city_id = $4 WHERE id = $5',
+            data['name'], float(data['price']), data['image_url'], int(data['city_id']), int(data['id'])
+        )
+    
+    return web.HTTPFound('/admin/bot-management#products')
+
+@routes.post('/admin/bot/products/add')
+async def add_product(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'INSERT INTO products (name, price, image_url, city_id) VALUES ($1, $2, $3, $4)',
+            data['name'], float(data['price']), data['image_url'], int(data['city_id'])
+        )
+    
+    return web.HTTPFound('/admin/bot-management#products')
+
+@routes.post('/admin/bot/products/delete/{product_id}')
+async def delete_product(request):
+    product_id = int(request.match_info['product_id'])
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute('DELETE FROM products WHERE id = $1', product_id)
+    
+    return web.HTTPFound('/admin/bot-management#products')
+
+@routes.post('/admin/bot/delivery-types/update')
+async def update_delivery_type(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'UPDATE delivery_types SET name = $1 WHERE id = $2',
+            data['name'], int(data['id'])
+        )
+    
+    return web.HTTPFound('/admin/bot-management#delivery')
+
+@routes.post('/admin/bot/delivery-types/add')
+async def add_delivery_type(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            'INSERT INTO delivery_types (name) VALUES ($1)',
+            data['name']
+        )
+    
+    return web.HTTPFound('/admin/bot-management#delivery')
+
+@routes.post('/admin/bot/delivery-types/delete/{type_id}')
+async def delete_delivery_type(request):
+    type_id = int(request.match_info['type_id'])
+    db_pool = request.app['db_pool']
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute('DELETE FROM delivery_types WHERE id = $1', type_id)
+    
+    return web.HTTPFound('/admin/bot-management#delivery')
+
 def create_admin_app():
     app = web.Application(middlewares=[auth_middleware])
     
