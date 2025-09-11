@@ -7,7 +7,6 @@ import json
 import asyncio
 import subprocess
 from datetime import datetime
-from database import db_pool
 
 logger = logging.getLogger(__name__)
 
