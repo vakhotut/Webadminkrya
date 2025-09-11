@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import asyncio
 
 from database import init_db, close_db
-from auth import auth_middleware
+from auth import auth_middleware, auth_routes
 from users import users_routes
 from orders import orders_routes
 from transactions import transactions_routes
@@ -33,6 +33,7 @@ def create_admin_app():
     aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader('templates'))
     
     # Добавление маршрутов из всех модулей
+    app.add_routes(auth_routes)
     app.add_routes(users_routes)
     app.add_routes(orders_routes)
     app.add_routes(transactions_routes)
