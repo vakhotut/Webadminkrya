@@ -1,5 +1,8 @@
+import logging
 from aiohttp import web
 import aiohttp_jinja2
+
+logger = logging.getLogger(__name__)
 
 transactions_routes = web.RouteTableDef()
 
