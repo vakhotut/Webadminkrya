@@ -1,6 +1,7 @@
 import logging
 from aiohttp import web
 import aiohttp_jinja2
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -166,4 +167,99 @@ async def users_list(request):
             'users': [],
             'page': 1,
             'total_pages': 0
-      }
+        }
+
+@users_routes.post('/admin/users/{user_id}/ban')
+async def ban_user(request):
+    user_id = int(request.match_info['user_id'])
+    db_pool = request.app['db_pool']
+    
+    try:
+        async with db_pool.acquire() as conn:
+            # Бан на 24 часа
+            ban_until = datetime.now() + timedelta(hours=24)
+            await conn.execute(
+                'UPDATE users SET ban_until = $1 WHERE user_id = $2',
+                ban_until, user_id
+            )
+        
+        return web.HTTPFound('/admin/users?message=User banned successfully')
+    except Exception as e:
+        logger.error(f"Error banning user {user_id}: {e}")
+        return web.HTTPFound('/admin/users?error=Error banning user')
+
+@users_routes.post('/admin/users/{user_id}/unban')
+async def unban_user(request):
+    user_id = int(request.match_info['user_id'])
+    db_pool = request.app['db_pool']
+    
+    try:
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                'UPDATE users SET ban_until = NULL WHERE user_id = $1',
+                user_id
+            )
+        
+        return web.HTTPFound('/admin/users?message=User unbanned successfully')
+    except Exception as e:
+        logger.error(f"Error unbanning user {user_id}: {e}")
+        return web.HTTPFound('/admin/users?error=Error unbanning user')
+
+@users_routes.post('/admin/users/{user_id}/balance')
+async def change_balance(request):
+    user_id = int(request.match_info['user_id'])
+    db_pool = request.app['db_pool']
+    data = await request.post()
+    
+    try:
+        amount = float(data['amount'])
+        is_subtract = 'is_subtract' in data
+        
+        async with db_pool.acquire() as conn:
+            if is_subtract:
+                await conn.execute(
+                    'UPDATE users SET balance = balance - $1 WHERE user_id = $2',
+                    amount, user_id
+                )
+            else:
+                await conn.execute(
+                    'UPDATE users SET balance = balance + $1 WHERE user_id = $2',
+                    amount, user_id
+                )
+        
+        action = "subtracted from" if is_subtract else "added to"
+        return web.HTTPFound(f'/admin/users?message=${amount} {action} balance successfully')
+    except Exception as e:
+        logger.error(f"Error changing balance for user {user_id}: {e}")
+        return web.HTTPFound('/admin/users?error=Error changing balance')
+
+@users_routes.post('/admin/users/{user_id}/discount')
+async def change_discount(request):
+    user_id = int(request.match_info['user_id'])
+    db_pool = request.app['db_pool']
+    data = await request.post()
+    
+    try:
+        discount = int(data['discount'])
+        is_temporary = 'is_temporary' in data
+        
+        async with db_pool.acquire() as conn:
+            if is_temporary:
+                # Для временной скидки можно добавить отдельное поле в БД
+                # Пока просто устанавливаем скидку
+                await conn.execute(
+                    'UPDATE users SET discount = $1 WHERE user_id = $2',
+                    discount, user_id
+                )
+            else:
+                # Постоянная скидка
+                await conn.execute(
+                    'UPDATE users SET discount = $1 WHERE user_id = $2',
+                    discount, user_id
+                )
+        
+        discount_type = "temporary" if is_temporary else "permanent"
+        return web.HTTPFound(f'/admin/users?message={discount_type.capitalize()} discount set to {discount}% successfully')
+    except Exception as e:
+        logger.error(f"Error changing discount for user {user_id}: {e}")
+        return web.HTTPFound('/admin/users?error=Error changing discount')
