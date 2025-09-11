@@ -1,6 +1,7 @@
 import os
 import jwt
 from aiohttp import web
+import aiohttp_jinja2
 from datetime import datetime, timedelta, timezone
 
 # Настройки
