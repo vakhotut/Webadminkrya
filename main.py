@@ -15,6 +15,7 @@ from payment_system import payment_system_routes
 from products import products_routes
 from bot_management import bot_management_routes
 from accounting import accounting_routes
+from settings import settings_routes  # Добавляем импорт модуля настроек
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -41,6 +42,7 @@ def create_admin_app():
     app.add_routes(products_routes)
     app.add_routes(bot_management_routes)
     app.add_routes(accounting_routes)
+    app.add_routes(settings_routes)  # Добавляем маршруты настроек
     
     app.on_startup.append(init_db)
     app.on_cleanup.append(close_db)
