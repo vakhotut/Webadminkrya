@@ -9,8 +9,9 @@ ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'password')
 JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')
 
 # Middleware для проверки аутентификации
+@web.middleware
 async def auth_middleware(request, handler):
-    if request.path.startswith('/admin/login') or request.path == '/admin':
+    if request.url.path.startswith('/admin/login') or request.url.path == '/admin':
         return await handler(request)
     
     token = request.cookies.get('auth_token')
@@ -35,9 +36,10 @@ async def admin_redirect(request):
     return web.HTTPFound('/admin/login')
 
 @auth_routes.get('/admin/login')
+@aiohttp_jinja2.template('login.html')
 async def login_form(request):
-    from aiohttp_jinja2 import template
-    return template('login.html')(request)
+    error = request.query.get('error')
+    return {'error': error}
 
 @auth_routes.post('/admin/login')
 async def login(request):
