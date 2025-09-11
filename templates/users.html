@@ -1,73 +1,256 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+    <meta charset="UTF-8">
     <title>Users - Admin Panel</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #343a40;
+            color: white;
+            transition: all 0.3s;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            border-left: 3px solid transparent;
+            padding: 0.75rem 1rem;
+        }
+        .sidebar .nav-link:hover {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-left: 3px solid #0d6efd;
+        }
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-left: 3px solid #0d6efd;
+        }
+        .submenu {
+            padding-left: 1.5rem;
+            background-color: rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        .submenu.show {
+            display: block;
+        }
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        .sidebar-header {
+            padding: 1rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+        .badge {
+            font-size: 0.75rem;
+        }
+        .btn-group .btn {
+            margin-right: 5px;
+        }
+    </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="/admin/dashboard">Admin Panel</a>
-            <div class="navbar-nav">
-                <a class="nav-link" href="/admin/dashboard">Dashboard</a>
-                <a class="nav-link active" href="/admin/users">Users</a>
-                <a class="nav-link" href="/admin/orders">Orders</a>
-            </div>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/admin/logout">Logout</a>
-            </div>
+    <!-- Левая панель навигации -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h5>Панель администратора</h5>
         </div>
-    </nav>
+        <nav class="navbar-nav">
+            <a class="nav-link" href="/admin/dashboard">
+                <i class="bi bi-speedometer2 me-2"></i>Главная
+            </a>
+            <a class="nav-link" href="/admin/bot-management">
+                <i class="bi bi-robot me-2"></i>Управление ботом
+            </a>
+            <a class="nav-link" href="/admin/products">
+                <i class="bi bi-box me-2"></i>Товары
+            </a>
+            <a class="nav-link" href="/admin/accounting">
+                <i class="bi bi-cash-coin me-2"></i>Бухгалтерия
+            </a>
+            <a class="nav-link" href="/admin/advertising">
+                <i class="bi bi-megaphone me-2"></i>Реклама
+            </a>
+            <a class="nav-link active" href="/admin/users">
+                <i class="bi bi-people me-2"></i>Пользователи
+            </a>
+            <a class="nav-link" href="/admin/orders">
+                <i class="bi bi-cart me-2"></i>Заказы
+            </a>
+            <a class="nav-link" href="/admin/transactions">
+                <i class="bi bi-credit-card me-2"></i>Транзакции
+            </a>
+            <a class="nav-link" href="/admin/payment-system">
+                <i class="bi bi-currency-bitcoin me-2"></i>Система оплаты
+            </a>
+            <a class="nav-link" href="#">
+                <i class="bi bi-gear me-2"></i>Настройки
+            </a>
+            <a class="nav-link" href="/admin/logout">
+                <i class="bi bi-box-arrow-right me-2"></i>Выход
+            </a>
+        </nav>
+    </div>
 
-    <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>User Management</h2>
-        </div>
+    <!-- Основной контент -->
+    <div class="main-content">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Управление пользователями</h2>
+            </div>
 
-        <div class="card">
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Username</th>
-                                <th>First Name</th>
-                                <th>Orders</th>
-                                <th>Balance</th>
-                                <th>Registered</th>
-                                <th>Last Purchase</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for user in users %}
-                            <tr>
-                                <td>{{ user.user_id }}</td>
-                                <td>{{ user.username or 'N/A' }}</td>
-                                <td>{{ user.first_name or 'N/A' }}</td>
-                                <td>{{ user.purchase_count }}</td>
-                                <td>${{ user.balance }}</td>
-                                <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
-                                <td>{{ user.last_purchase.strftime('%Y-%m-%d') if user.last_purchase else 'Never' }}</td>
-                            </tr>
+            {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+            {% endif %}
+
+            {% if message %}
+            <div class="alert alert-success">{{ message }}</div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>First Name</th>
+                                    <th>Orders</th>
+                                    <th>Balance</th>
+                                    <th>Discount</th>
+                                    <th>Status</th>
+                                    <th>Registered</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.user_id }}</td>
+                                    <td>{{ user.username or 'N/A' }}</td>
+                                    <td>{{ user.first_name or 'N/A' }}</td>
+                                    <td>{{ user.purchase_count }}</td>
+                                    <td>${{ "%.2f"|format(user.balance) }}</td>
+                                    <td>{{ user.discount }}%</td>
+                                    <td>
+                                        {% if user.ban_until %}
+                                        <span class="badge bg-danger">Banned</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            {% if user.ban_until %}
+                                            <form action="/admin/users/{{ user.user_id }}/unban" method="post">
+                                                <button type="submit" class="btn btn-sm btn-success">Unban</button>
+                                            </form>
+                                            {% else %}
+                                            <form action="/admin/users/{{ user.user_id }}/ban" method="post">
+                                                <button type="submit" class="btn btn-sm btn-warning">Ban</button>
+                                            </form>
+                                            {% endif %}
+                                            
+                                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#balanceModal{{ user.user_id }}">
+                                                Balance
+                                            </button>
+                                            
+                                            <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#discountModal{{ user.user_id }}">
+                                                Discount
+                                            </button>
+                                        </div>
+
+                                        <!-- Modal for balance -->
+                                        <div class="modal fade" id="balanceModal{{ user.user_id }}" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Change Balance</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <form action="/admin/users/{{ user.user_id }}/balance" method="post">
+                                                        <div class="modal-body">
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Current Balance: ${{ "%.2f"|format(user.balance) }}</label>
+                                                                <input type="number" step="0.01" class="form-control" name="amount" required placeholder="Amount">
+                                                                <div class="form-check mt-2">
+                                                                    <input class="form-check-input" type="checkbox" name="is_subtract" id="subtract{{ user.user_id }}">
+                                                                    <label class="form-check-label" for="subtract{{ user.user_id }}">Subtract from balance</label>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-primary">Save</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Modal for discount -->
+                                        <div class="modal fade" id="discountModal{{ user.user_id }}" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Change Discount</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <form action="/admin/users/{{ user.user_id }}/discount" method="post">
+                                                        <div class="modal-body">
+                                                            <div class="mb-3">
+                                                                <label class="form-label">Current Discount: {{ user.discount }}%</label>
+                                                                <input type="number" class="form-control" name="discount" required min="0" max="100" placeholder="Discount %">
+                                                            </div>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="checkbox" name="is_temporary" id="temp{{ user.user_id }}">
+                                                                <label class="form-check-label" for="temp{{ user.user_id }}">Temporary discount (24 hours)</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-primary">Save</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if total_pages > 1 %}
+                    <nav>
+                        <ul class="pagination">
+                            {% for p in range(1, total_pages + 1) %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+                            </li>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                        </ul>
+                    </nav>
+                    {% endif %}
                 </div>
-
-                {% if total_pages > 1 %}
-                <nav>
-                    <ul class="pagination">
-                        {% for p in range(1, total_pages + 1) %}
-                        <li class="page-item {% if p == page %}active{% endif %}">
-                            <a class="page-link" href="?page={{ p }}">{{ p }}</a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </nav>
-                {% endif %}
             </div>
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-</html>
+    </html>
