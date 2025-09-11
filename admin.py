@@ -20,8 +20,33 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 
 # Импорты для работы с кошельком и API
-from ltc_hdwallet import ltc_wallet
-from api import get_ltc_usd_rate, check_transaction_blockchair, check_transaction_sochain, check_transaction_nownodes
+try:
+    from ltc_hdwallet import ltc_wallet
+    from api import get_ltc_usd_rate, check_transaction_blockchair, check_transaction_sochain, check_transaction_nownodes
+except ImportError as e:
+    logging.warning(f"Не удалось импортировать модули кошелька и API: {e}")
+    # Создаем заглушки для избежания ошибок
+    class WalletStub:
+        def health_check(self):
+            return {"status": "error", "message": "Wallet module not available"}
+        def generate_address(self, index=None):
+            return {"address": "NOT_AVAILABLE", "index": 0}
+        def backup_wallet(self, path):
+            return False
+    
+    ltc_wallet = WalletStub()
+    
+    async def get_ltc_usd_rate():
+        return 0.0
+    
+    async def check_transaction_blockchair(address, amount):
+        return None
+    
+    async def check_transaction_sochain(address, amount):
+        return None
+    
+    async def check_transaction_nownodes(address, amount):
+        return None
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -1011,7 +1036,7 @@ async def bot_management(request):
                     'error': 'Таблицы бота не созданы. Запустите сначала основного бота.',
                     'texts': [],
                     'languages': [],
-                    'c cities': [],
+                    'cities': [],
                     'districts': [],
                     'products': [],
                     'delivery_types': []
@@ -1321,27 +1346,39 @@ async def accounting(request):
                     WHERE 1=1
                 '''
                 count_query = 'SELECT COUNT(*) FROM purchases p WHERE 1=1'
+                params = []
+                param_count = 0
                 
                 if start_date:
-                    query += f" AND p.purchase_time >= '{start_date}'"
-                    count_query += f" AND p.purchase_time >= '{start_date}'"
+                    param_count += 1
+                    query += f" AND p.purchase_time >= ${param_count}"
+                    count_query += f" AND p.purchase_time >= ${param_count}"
+                    params.append(start_date)
                 if end_date:
-                    query += f" AND p.purchase_time <= '{end_date} 23:59:59'"
-                    count_query += f" AND p.purchase_time <= '{end_date} 23:59:59'"
+                    param_count += 1
+                    query += f" AND p.purchase_time <= ${param_count}"
+                    count_query += f" AND p.purchase_time <= ${param_count}"
+                    params.append(end_date + ' 23:59:59')
                 
                 query += ' ORDER BY p.purchase_time DESC'
                 
-                records = await conn.fetch(query)
-                total_count = await conn.fetchval(count_query)
+                records = await conn.fetch(query, *params)
+                total_count = await conn.fetchval(count_query, *params)
                 
                 # Статистика
                 revenue_query = 'SELECT COALESCE(SUM(price), 0) FROM purchases p WHERE 1=1'
+                revenue_params = []
+                param_count_revenue = 0
                 if start_date:
-                    revenue_query += f" AND p.purchase_time >= '{start_date}'"
+                    param_count_revenue += 1
+                    revenue_query += f" AND p.purchase_time >= ${param_count_revenue}"
+                    revenue_params.append(start_date)
                 if end_date:
-                    revenue_query += f" AND p.purchase_time <= '{end_date} 23:59:59'"
+                    param_count_revenue += 1
+                    revenue_query += f" AND p.purchase_time <= ${param_count_revenue}"
+                    revenue_params.append(end_date + ' 23:59:59')
                 
-                total_revenue = await conn.fetchval(revenue_query)
+                total_revenue = await conn.fetchval(revenue_query, *revenue_params)
                 
                 return {
                     'records': records,
@@ -1361,27 +1398,39 @@ async def accounting(request):
                     WHERE t.status = 'canceled'
                 '''
                 count_query = "SELECT COUNT(*) FROM transactions t WHERE t.status = 'canceled'"
+                params = []
+                param_count = 0
                 
                 if start_date:
-                    query += f" AND t.created_at >= '{start_date}'"
-                    count_query += f" AND t.created_at >= '{start_date}'"
+                    param_count += 1
+                    query += f" AND t.created_at >= ${param_count}"
+                    count_query += f" AND t.created_at >= ${param_count}"
+                    params.append(start_date)
                 if end_date:
-                    query += f" AND t.created_at <= '{end_date} 23:59:59'"
-                    count_query += f" AND t.created_at <= '{end_date} 23:59:59'"
+                    param_count += 1
+                    query += f" AND t.created_at <= ${param_count}"
+                    count_query += f" AND t.created_at <= ${param_count}"
+                    params.append(end_date + ' 23:59:59')
                 
                 query += ' ORDER BY t.created_at DESC'
                 
-                records = await conn.fetch(query)
-                total_count = await conn.fetchval(count_query)
+                records = await conn.fetch(query, *params)
+                total_count = await conn.fetchval(count_query, *params)
                 
                 # Статистика
                 refunds_query = "SELECT COALESCE(SUM(amount), 0) FROM transactions t WHERE t.status = 'canceled'"
+                refunds_params = []
+                param_count_refunds = 0
                 if start_date:
-                    refunds_query += f" AND t.created_at >= '{start_date}'"
+                    param_count_refunds += 1
+                    refunds_query += f" AND t.created_at >= ${param_count_refunds}"
+                    refunds_params.append(start_date)
                 if end_date:
-                    refunds_query += f" AND t.created_at <= '{end_date} 23:59:59'"
+                    param_count_refunds += 1
+                    refunds_query += f" AND t.created_at <= ${param_count_refunds}"
+                    refunds_params.append(end_date + ' 23:59:59')
                 
-                total_refunds = await conn.fetchval(refunds_query)
+                total_refunds = await conn.fetchval(refunds_query, *refunds_params)
                 
                 return {
                     'records': records,
@@ -1401,29 +1450,41 @@ async def accounting(request):
                     WHERE 1=1
                 '''
                 count_query = 'SELECT COUNT(*) FROM transactions t WHERE 1=1'
+                params = []
+                param_count = 0
                 
                 if start_date:
-                    query += f" AND t.created_at >= '{start_date}'"
-                    count_query += f" AND t.created_at >= '{start_date}'"
+                    param_count += 1
+                    query += f" AND t.created_at >= ${param_count}"
+                    count_query += f" AND t.created_at >= ${param_count}"
+                    params.append(start_date)
                 if end_date:
-                    query += f" AND t.created_at <= '{end_date} 23:59:59'"
-                    count_query += f" AND t.created_at <= '{end_date} 23:59:59'"
+                    param_count += 1
+                    query += f" AND t.created_at <= ${param_count}"
+                    count_query += f" AND t.created_at <= ${param_count}"
+                    params.append(end_date + ' 23:59:59')
                 
                 query += ' ORDER BY t.created_at DESC'
                 
-                records = await conn.fetch(query)
-                total_count = await conn.fetchval(count_query)
+                records = await conn.fetch(query, *params)
+                total_count = await conn.fetchval(count_query, *params)
                 
                 # Статистика по статусам
                 status_stats = {}
                 for status in ['pending', 'paid', 'canceled']:
                     status_query = f"SELECT COALESCE(SUM(amount), 0) FROM transactions t WHERE t.status = '{status}'"
+                    status_params = []
+                    param_count_status = 0
                     if start_date:
-                    status_query += f" AND t.created_at >= '{start_date}'"
+                        param_count_status += 1
+                        status_query += f" AND t.created_at >= ${param_count_status}"
+                        status_params.append(start_date)
                     if end_date:
-                        status_query += f" AND t.created_at <= '{end_date} 23:59:59'"
+                        param_count_status += 1
+                        status_query += f" AND t.created_at <= ${param_count_status}"
+                        status_params.append(end_date + ' 23:59:59')
                     
-                    status_amount = await conn.fetchval(status_query)
+                    status_amount = await conn.fetchval(status_query, *status_params)
                     status_stats[status] = status_amount
                 
                 return {
@@ -1465,14 +1526,21 @@ async def export_accounting_excel(request):
                     LEFT JOIN users u ON p.user_id = u.user_id 
                     WHERE 1=1
                 '''
+                params = []
+                param_count = 0
+                
                 if start_date:
-                    query += f" AND p.purchase_time >= '{start_date}'"
+                    param_count += 1
+                    query += f" AND p.purchase_time >= ${param_count}"
+                    params.append(start_date)
                 if end_date:
-                    query += f" AND p.purchase_time <= '{end_date} 23:59:59'"
+                    param_count += 1
+                    query += f" AND p.purchase_time <= ${param_count}"
+                    params.append(end_date + ' 23:59:59')
                 
                 query += ' ORDER BY p.purchase_time DESC'
                 
-                records = await conn.fetch(query)
+                records = await conn.fetch(query, *params)
                 
                 # Создаем CSV в памяти
                 output = io.StringIO()
@@ -1511,14 +1579,21 @@ async def export_accounting_excel(request):
                     LEFT JOIN users u ON t.user_id = u.user_id 
                     WHERE t.status = 'canceled'
                 '''
+                params = []
+                param_count = 0
+                
                 if start_date:
-                    query += f" AND t.created_at >= '{start_date}'"
+                    param_count += 1
+                    query += f" AND t.created_at >= ${param_count}"
+                    params.append(start_date)
                 if end_date:
-                    query += f" AND t.created_at <= '{end_date} 23:59:59'"
+                    param_count += 1
+                    query += f" AND t.created_at <= ${param_count}"
+                    params.append(end_date + ' 23:59:59')
                 
                 query += ' ORDER BY t.created_at DESC'
                 
-                records = await conn.fetch(query)
+                records = await conn.fetch(query, *params)
                 
                 # Создаем CSV в памяти
                 output = io.StringIO()
@@ -1557,21 +1632,28 @@ async def export_accounting_excel(request):
                     LEFT JOIN users u ON t.user_id = u.user_id 
                     WHERE 1=1
                 '''
+                params = []
+                param_count = 0
+                
                 if start_date:
-                    query += f" AND t.created_at >= '{start_date}'"
+                    param_count += 1
+                    query += f" AND t.created_at >= ${param_count}"
+                    params.append(start_date)
                 if end_date:
-                    query += f" AND t.created_at <= '{end_date} 23:59:59'"
+                    param_count += 1
+                    query += f" AND t.created_at <= ${param_count}"
+                    params.append(end_date + ' 23:59:59')
                 
                 query += ' ORDER BY t.created_at DESC'
                 
-                records = await conn.fetch(query)
+                records = await conn.fetch(query, *params)
                 
                 # Создаем CSV в памяти
                 output = io.StringIO()
                 writer = csv.writer(output)
                 
                 # Заголовки
-                writer.writerow(['Дата', 'Пользователь', 'Имя', 'Сумма', 'Валюта', 'Статус', 'ID транзакции'])
+                writer.writerow(['Дата', 'Пользователь', 'Имя', 'Сумma', 'Валюта', 'Статус', 'ID транзакции'])
                 
                 # Данные
                 for record in records:
@@ -1619,14 +1701,21 @@ async def export_accounting_pdf(request):
                     LEFT JOIN users u ON p.user_id = u.user_id 
                     WHERE 1=1
                 '''
+                params = []
+                param_count = 0
+                
                 if start_date:
-                    query += f" AND p.purchase_time >= '{start_date}'"
+                    param_count += 1
+                    query += f" AND p.purchase_time >= ${param_count}"
+                    params.append(start_date)
                 if end_date:
-                    query += f" AND p.purchase_time <= '{end_date} 23:59:59'"
+                    param_count += 1
+                    query += f" AND p.purchase_time <= ${param_count}"
+                    params.append(end_date + ' 23:59:59')
                 
                 query += ' ORDER BY p.purchase_time DESC'
                 
-                records = await conn.fetch(query)
+                records = await conn.fetch(query, *params)
                 
                 # Создаем PDF в памяти
                 buffer = io.BytesIO()
