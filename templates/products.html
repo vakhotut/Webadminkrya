@@ -124,9 +124,6 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link {% if active_tab == 'sold' %}active{% endif %}" id="sold-tab" data-bs-toggle="tab" data-bs-target="#sold" type="button" role="tab" onclick="window.location.href='/admin/products?tab=sold'">Проданные товары</button>
                 </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link {% if active_tab == 'disputed' %}active{% endif %}" id="disputed-tab" data-bs-toggle="tab" data-bs-target="#disputed" type="button" role="tab" onclick="window.location.href='/admin/products?tab=disputed'">Disputes</button>
-                </li>
             </ul>
             
             <div class="tab-content" id="productsTabContent">
@@ -148,6 +145,7 @@
                                     <th>Район</th>
                                     <th>Тип доставки</th>
                                     <th>Цена</th>
+                                    <th>Количество</th>
                                     <th>Изображение</th>
                                     <th>Действия</th>
                                 </tr>
@@ -162,6 +160,7 @@
                                     <td>{{ product.district_name }}</td>
                                     <td>{{ product.delivery_type_name }}</td>
                                     <td>${{ product.price }}</td>
+                                    <td>{{ product.quantity }}</td>
                                     <td>
                                         {% if product.image_url %}
                                         <img src="{{ product.image_url }}" class="product-image" alt="{{ product.name }}">
@@ -175,7 +174,7 @@
                                                 data-description="{{ product.description }}" data-price="{{ product.price }}"
                                                 data-image="{{ product.image_url }}" data-category="{{ product.category_id }}"
                                                 data-city="{{ product.city_id }}" data-district="{{ product.district_id }}"
-                                                data-delivery="{{ product.delivery_type_id }}">
+                                                data-delivery="{{ product.delivery_type_id }}" data-quantity="{{ product.quantity }}">
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <form action="/admin/products/delete/{{ product.id }}" method="post" class="d-inline">
@@ -223,6 +222,11 @@
                                 <div class="mb-3">
                                     <label class="form-label">Цена ($) *</label>
                                     <input type="number" step="0.01" class="form-control" name="price" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Количество *</label>
+                                    <input type="number" class="form-control" name="quantity" value="1" min="1" required>
                                 </div>
                                 
                                 <div class="mb-3">
@@ -352,82 +356,6 @@
                     {% endif %}
                     {% endif %}
                 </div>
-                
-                <!-- Вкладка disputes -->
-                <div class="tab-pane fade {% if active_tab == 'disputed' %}show active{% endif %}" id="disputed" role="tabpanel">
-                    {% if disputed_products|length == 0 and not error %}
-                    <div class="alert alert-info mt-3" role="alert">
-                        Нет активных disputes.
-                    </div>
-                    {% else %}
-                    <div class="table-responsive mt-3">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Товар</th>
-                                    <th>Пользователь</th>
-                                    <th>Цена</th>
-                                    <th>Причина</th>
-                                    <th>Статус</th>
-                                    <th>Дата создания</th>
-                                    <th>Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for disputed_product in disputed_products %}
-                                <tr>
-                                    <td>{{ disputed_product.id }}</td>
-                                    <td>{{ disputed_product.product_name }}</td>
-                                    <td>
-                                        {% if disputed_product.username %}
-                                        @{{ disputed_product.username }}
-                                        {% else %}
-                                        ID: {{ disputed_product.user_id }}
-                                        {% endif %}
-                                    </td>
-                                    <td>${{ disputed_product.sold_price }}</td>
-                                    <td>{{ disputed_product.reason }}</td>
-                                    <td>
-                                        <span class="badge {% if disputed_product.status == 'pending' %}bg-warning{% elif disputed_product.status == 'approved' %}bg-success{% else %}bg-danger{% endif %}">
-                                            {{ disputed_product.status }}
-                                        </span>
-                                    </td>
-                                    <td>{{ disputed_product.created_at }}</td>
-                                    <td>
-                                        {% if disputed_product.status == 'pending' %}
-                                        <div class="btn-group">
-                                            <form action="/admin/disputes/approve/{{ disputed_product.id }}" method="post" class="d-inline">
-                                                <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Одобрить возврат?')">Принять</button>
-                                            </form>
-                                            <form action="/admin/disputes/reject/{{ disputed_product.id }}" method="post" class="d-inline">
-                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Отклонить возврат?')">Отклонить</button>
-                                            </form>
-                                        </div>
-                                        {% else %}
-                                        <span class="text-muted">Завершено: {{ disputed_product.resolved_at }}</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Пагинация -->
-                    {% if total_pages > 1 %}
-                    <nav aria-label="Page navigation">
-                        <ul class="pagination">
-                            {% for page_num in range(1, total_pages + 1) %}
-                            <li class="page-item {% if page_num == page %}active{% endif %}">
-                                <a class="page-link" href="/admin/products?tab=disputed&page={{ page_num }}">{{ page_num }}</a>
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    </nav>
-                    {% endif %}
-                    {% endif %}
-                </div>
             </div>
         </div>
     </div>
@@ -457,6 +385,11 @@
                                 <div class="mb-3">
                                     <label class="form-label">Цена ($)</label>
                                     <input type="number" step="0.01" class="form-control" name="price" id="editPrice" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Количество</label>
+                                    <input type="number" class="form-control" name="quantity" id="editQuantity" min="1" required>
                                 </div>
                                 
                                 <div class="mb-3">
@@ -554,6 +487,7 @@
             document.getElementById('editName').value = button.getAttribute('data-name');
             document.getElementById('editDescription').value = button.getAttribute('data-description');
             document.getElementById('editPrice').value = button.getAttribute('data-price');
+            document.getElementById('editQuantity').value = button.getAttribute('data-quantity');
             document.getElementById('editImageUrl').value = button.getAttribute('data-image');
             document.getElementById('editCategoryId').value = button.getAttribute('data-category');
             document.getElementById('editCityId').value = button.getAttribute('data-city');
@@ -611,6 +545,18 @@
                 }
             }
         });
+
+        // Автоматическое обновление данных о продажах каждые 30 секунд
+        function startAutoRefresh() {
+            setInterval(() => {
+                if (window.location.search.includes('tab=sold')) {
+                    window.location.reload();
+                }
+            }, 30000);
+        }
+
+        // Запускаем автообновление при загрузке страницы
+        document.addEventListener('DOMContentLoaded', startAutoRefresh);
     </script>
 </body>
     </html>
