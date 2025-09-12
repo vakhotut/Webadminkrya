@@ -127,6 +127,16 @@
                         <i class="bi bi-truck me-1"></i> Доставка
                     </button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="links-tab" data-bs-toggle="tab" data-bs-target="#links" type="button" role="tab" aria-controls="links" aria-selected="false">
+                        <i class="bi bi-link me-1"></i> Ссылки
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="images-tab" data-bs-toggle="tab" data-bs-target="#images" type="button" role="tab" aria-controls="images" aria-selected="false">
+                        <i class="bi bi-image me-1"></i> Изображения
+                    </button>
+                </li>
             </ul>
             
             <!-- Содержимое вкладок -->
@@ -564,6 +574,94 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Вкладка ссылок -->
+                <div class="tab-pane fade" id="links" role="tabpanel" aria-labelledby="links-tab">
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5>Управление ссылками</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" action="/admin/bot/settings/update">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Ссылка на оператора</label>
+                                            <input type="text" name="operator_link" value="{{ bot_settings.get('operator_link', '') }}" class="form-control">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Ссылка на техподдержку</label>
+                                            <input type="text" name="support_link" value="{{ bot_settings.get('support_link', '') }}" class="form-control">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Ссылка на правила</label>
+                                            <input type="text" name="rules_link" value="{{ bot_settings.get('rules_link', '') }}" class="form-control">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Ссылка на канал</label>
+                                            <input type="text" name="channel_link" value="{{ bot_settings.get('channel_link', '') }}" class="form-control">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Ссылка на отзывы</label>
+                                            <input type="text" name="reviews_link" value="{{ bot_settings.get('reviews_link', '') }}" class="form-control">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Ссылка на сайт</label>
+                                            <input type="text" name="website_link" value="{{ bot_settings.get('website_link', '') }}" class="form-control">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Сохранить все ссылки</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка изображений -->
+                <div class="tab-pane fade" id="images" role="tabpanel" aria-labelledby="images-tab">
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5>Управление изображениями меню</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" action="/admin/bot/settings/update">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Главное меню</label>
+                                            <input type="text" name="main_menu_image" value="{{ bot_settings.get('main_menu_image', '') }}" class="form-control">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Меню баланса</label>
+                                            <input type="text" name="balance_menu_image" value="{{ bot_settings.get('balance_menu_image', '') }}" class="form-control">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Меню категорий</label>
+                                            <input type="text" name="category_menu_image" value="{{ bot_settings.get('category_menu_image', '') }}" class="form-control">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Меню районов</label>
+                                            <input type="text" name="district_menu_image" value="{{ bot_settings.get('district_menu_image', '') }}" class="form-control">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Меню доставки</label>
+                                            <input type="text" name="delivery_menu_image" value="{{ bot_settings.get('delivery_menu_image', '') }}" class="form-control">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Меню подтверждения</label>
+                                            <input type="text" name="confirmation_menu_image" value="{{ bot_settings.get('confirmation_menu_image', '') }}" class="form-control">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Сохранить все изображения</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -595,4 +693,4 @@
         });
     </script>
 </body>
-  </html>
+    </html>
