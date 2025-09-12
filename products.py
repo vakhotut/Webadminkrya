@@ -1,4 +1,3 @@
-# products.py
 import uuid
 from aiohttp import web
 import aiohttp_jinja2
@@ -35,7 +34,6 @@ async def products_list(request):
                     'districts': [],
                     'delivery_types': [],
                     'sold_products': [],
-                    'disputed_products': [],
                     'page': 1,
                     'total_pages': 0,
                     'active_tab': active_tab
@@ -69,20 +67,6 @@ async def products_list(request):
                 ''', per_page, offset)
                 
                 total_products = await conn.fetchval('SELECT COUNT(*) FROM sold_products')
-                total_pages = (total_products + per_page - 1) // per_page
-                
-            elif active_tab == 'disputed':
-                products = await conn.fetch('''
-                    SELECT dp.*, p.name as product_name, u.user_id, u.username, sp.sold_price
-                    FROM disputed_products dp
-                    LEFT JOIN sold_products sp ON dp.sold_product_id = sp.id
-                    LEFT JOIN products p ON sp.product_id = p.id
-                    LEFT JOIN users u ON sp.user_id = u.user_id
-                    ORDER BY dp.created_at DESC
-                    LIMIT $1 OFFSET $2
-                ''', per_page, offset)
-                
-                total_products = await conn.fetchval('SELECT COUNT(*) FROM disputed_products')
                 total_pages = (total_products + per_page - 1) // per_page
             else:
                 products = []
@@ -119,9 +103,8 @@ async def products_list(request):
             if delivery_types_table_exists:
                 delivery_types = await conn.fetch('SELECT * FROM delivery_types ORDER BY name')
             
-            # Загружаем отдельно проданные товары и disputes для соответствующих вкладок
+            # Загружаем отдельно проданные товары для соответствующей вкладки
             sold_products = []
-            disputed_products = []
             
             if active_tab == 'sold':
                 sold_products = await conn.fetch('''
@@ -132,15 +115,6 @@ async def products_list(request):
                     ORDER BY sp.sold_at DESC
                     LIMIT 50
                 ''')
-            elif active_tab == 'disputed':
-                disputed_products = await conn.fetch('''
-                    SELECT dp.*, p.name as product_name, u.user_id, u.username, sp.sold_price
-                    FROM disputed_products dp
-                    LEFT JOIN sold_products sp ON dp.sold_product_id = sp.id
-                    LEFT JOIN products p ON sp.product_id = p.id
-                    LEFT JOIN users u ON sp.user_id = u.user_id
-                    ORDER BY dp.created_at DESC
-                ''')
         
         return {
             'products': products,
@@ -149,7 +123,6 @@ async def products_list(request):
             'districts': districts,
             'delivery_types': delivery_types,
             'sold_products': sold_products,
-            'disputed_products': disputed_products,
             'page': page,
             'total_pages': total_pages,
             'active_tab': active_tab
@@ -164,7 +137,6 @@ async def products_list(request):
             'districts': [],
             'delivery_types': [],
             'sold_products': [],
-            'disputed_products': [],
             'page': 1,
             'total_pages': 0,
             'active_tab': active_tab
@@ -178,6 +150,7 @@ async def add_product(request):
     try:
         # Генерируем уникальный идентификатор товара
         product_uuid = str(uuid.uuid4())
+        quantity = int(data.get('quantity', 1))
         
         async with db_pool.acquire() as conn:
             # Если выбрана новая категория, создаем ее
@@ -219,10 +192,10 @@ async def add_product(request):
             # Добавляем товар
             await conn.execute('''
                 INSERT INTO products 
-                (uuid, name, description, price, image_url, category_id, city_id, district_id, delivery_type_id)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                (uuid, name, description, price, image_url, category_id, city_id, district_id, delivery_type_id, quantity)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             ''', product_uuid, data['name'], data['description'], float(data['price']), 
-               data['image_url'], category_id, city_id, district_id, delivery_type_id)
+               data['image_url'], category_id, city_id, district_id, delivery_type_id, quantity)
         
         return web.HTTPFound('/admin/products?tab=catalog')
     except Exception as e:
@@ -236,16 +209,18 @@ async def update_product(request):
     db_pool = request.app['db_pool']
     
     try:
+        quantity = int(data.get('quantity', 1))
+        
         async with db_pool.acquire() as conn:
             await conn.execute('''
                 UPDATE products 
                 SET name = $1, description = $2, price = $3, image_url = $4,
-                    category_id = $5, city_id = $6, district_id = $7, delivery_type_id = $8,
+                    category_id = $5, city_id = $6, district_id = $7, delivery_type_id = $8, quantity = $9,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = $9
+                WHERE id = $10
             ''', data['name'], data['description'], float(data['price']), data['image_url'],
                int(data['category_id']), int(data['city_id']), int(data['district_id']), 
-               int(data['delivery_type_id']), product_id)
+               int(data['delivery_type_id']), quantity, product_id)
         
         return web.HTTPFound('/admin/products?tab=catalog')
     except Exception as e:
@@ -265,44 +240,3 @@ async def delete_product(request):
     except Exception as e:
         logger.error(f"Error in delete_product: {e}")
         return web.HTTPFound('/admin/products?tab=catalog&error=1')
-
-@products_routes.post('/admin/disputes/approve/{dispute_id}')
-async def approve_dispute(request):
-    dispute_id = int(request.match_info['dispute_id'])
-    db_pool = request.app['db_pool']
-    
-    try:
-        async with db_pool.acquire() as conn:
-            # Обновляем статус dispute
-            await conn.execute('''
-                UPDATE disputed_products 
-                SET status = 'approved', resolved_at = CURRENT_TIMESTAMP
-                WHERE id = $1
-            ''', dispute_id)
-            
-            # Здесь можно добавить логику возврата средств пользователю
-            # Например, получить информацию о покупке и вернуть сумму на баланс пользователя
-            
-        return web.HTTPFound('/admin/products?tab=disputed')
-    except Exception as e:
-        logger.error(f"Error in approve_dispute: {e}")
-        return web.HTTPFound('/admin/products?tab=disputed&error=1')
-
-@products_routes.post('/admin/disputes/reject/{dispute_id}')
-async def reject_dispute(request):
-    dispute_id = int(request.match_info['dispute_id'])
-    db_pool = request.app['db_pool']
-    
-    try:
-        async with db_pool.acquire() as conn:
-            # Обновляем статус dispute
-            await conn.execute('''
-                UPDATE disputed_products 
-                SET status = 'rejected', resolved_at = CURRENT_TIMESTAMP
-                WHERE id = $1
-            ''', dispute_id)
-            
-        return web.HTTPFound('/admin/products?tab=disputed')
-    except Exception as e:
-        logger.error(f"Error in reject_dispute: {e}")
-        return web.HTTPFound('/admin/products?tab=disputed&error=1')
