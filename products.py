@@ -29,7 +29,7 @@ async def products_list(request):
                 return {
                     'error': 'Таблица товаров не создана. Запустите сначала основного бота.',
                     'products': [],
-                    'cities': [],
+                    'c cities': [],
                     'categories': [],
                     'districts': [],
                     'delivery_types': [],
@@ -58,7 +58,8 @@ async def products_list(request):
                 
             elif active_tab == 'sold':
                 products = await conn.fetch('''
-                    SELECT sp.*, p.name as product_name, u.user_id, u.username
+                    SELECT sp.*, p.name as product_name, u.user_id, u.username,
+                           u.first_name, sp.sold_at, sp.sold_price, sp.quantity
                     FROM sold_products sp
                     LEFT JOIN products p ON sp.product_id = p.id
                     LEFT JOIN users u ON sp.user_id = u.user_id
@@ -108,7 +109,8 @@ async def products_list(request):
             
             if active_tab == 'sold':
                 sold_products = await conn.fetch('''
-                    SELECT sp.*, p.name as product_name, u.user_id, u.username
+                    SELECT sp.*, p.name as product_name, u.user_id, u.username,
+                           u.first_name, sp.sold_at, sp.sold_price, sp.quantity
                     FROM sold_products sp
                     LEFT JOIN products p ON sp.product_id = p.id
                     LEFT JOIN users u ON sp.user_id = u.user_id
