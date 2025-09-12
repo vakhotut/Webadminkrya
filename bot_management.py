@@ -26,7 +26,8 @@ async def bot_management(request):
                     'cities': [],
                     'districts': [],
                     'products': [],
-                    'delivery_types': []
+                    'delivery_types': [],
+                    'bot_settings': {}
                 }
             
             # Загружаем данные для всех разделов
@@ -49,14 +50,19 @@ async def bot_management(request):
             ''')
             
             delivery_types = await conn.fetch('SELECT * FROM delivery_types ORDER BY name')
+            
+            # Загружаем настройки бота
+            bot_settings_rows = await conn.fetch('SELECT * FROM bot_settings')
+            bot_settings = {row['key']: row['value'] for row in bot_settings_rows}
         
         return {
             'texts': texts,
             'languages': [lang['lang'] for lang in languages],
-            'c cities': cities,
+            'cities': cities,
             'districts': districts,
             'products': products,
-            'delivery_types': delivery_types
+            'delivery_types': delivery_types,
+            'bot_settings': bot_settings
         }
     except Exception as e:
         import logging
@@ -69,7 +75,8 @@ async def bot_management(request):
             'cities': [],
             'districts': [],
             'products': [],
-            'delivery_types': []
+            'delivery_types': [],
+            'bot_settings': {}
         }
 
 @bot_management_routes.post('/admin/bot/texts/update')
@@ -341,3 +348,28 @@ async def delete_delivery_type(request):
         logger = logging.getLogger(__name__)
         logger.error(f"Error in delete_delivery_type: {e}")
         return web.HTTPFound('/admin/bot-management?error=1#delivery')
+
+@bot_management_routes.post('/admin/bot/settings/update')
+async def update_bot_settings(request):
+    data = await request.post()
+    db_pool = request.app['db_pool']
+    
+    try:
+        async with db_pool.acquire() as conn:
+            for key in data:
+                if key in ['operator_link', 'support_link', 'rules_link', 'channel_link', 
+                          'reviews_link', 'website_link', 'main_menu_image', 'balance_menu_image',
+                          'category_menu_image', 'district_menu_image', 'delivery_menu_image',
+                          'confirmation_menu_image']:
+                    await conn.execute('''
+                        INSERT INTO bot_settings (key, value)
+                        VALUES ($1, $2)
+                        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+                    ''', key, data[key])
+        
+        return web.HTTPFound('/admin/bot-management#links')
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in update_bot_settings: {e}")
+        return web.HTTPFound('/admin/bot-management?error=1#links')
