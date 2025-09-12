@@ -54,6 +54,30 @@
         .status-warning { color: #ffc107; }
         .status-danger { color: #dc3545; }
         .qr-code { max-width: 200px; }
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        .status-warning { background-color: #ffc107; }
+        .progress {
+            height: 8px;
+            margin-top: 5px;
+        }
+        .system-status-card {
+            border-left: 4px solid #0d6efd;
+        }
+        .service-status-card {
+            transition: all 0.3s;
+        }
+        .service-status-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
@@ -90,7 +114,7 @@
             <a class="nav-link active" href="/admin/payment-system">
                 <i class="bi bi-currency-bitcoin me-2"></i>Система оплаты
             </a>
-            <a class="nav-link" href="#">
+            <a class="nav-link" href="/admin/settings">
                 <i class="bi bi-gear me-2"></i>Настройки
             </a>
             <a class="nav-link" href="/admin/logout">
@@ -110,38 +134,30 @@
                     <div class="alert alert-danger">{{ error }}</div>
                     {% endif %}
                     
-                    <!-- Статус кошелька -->
+                    <!-- Статус системы -->
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5>Статус LTC кошелька</h5>
+                            <div class="card system-status-card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5>Статус системы</h5>
+                                    <span class="badge bg-{{ 'success' if wallet_status.healthy else 'danger' }}">
+                                        {{ 'Online' if wallet_status.healthy else 'Offline' }}
+                                    </span>
                                 </div>
                                 <div class="card-body">
                                     <div class="row">
                                         <div class="col-6">
-                                            <p><strong>Статус:</strong> 
-                                                <span class="status-{{ wallet_health.status }}">
-                                                    {% if wallet_health.status == 'healthy' %}Работает нормально
-                                                    {% elif wallet_health.status == 'unhealthy' %}Ошибка
-                                                    {% else %}Неизвестно{% endif %}
-                                                </span>
-                                            </p>
-                                            <p><strong>Текущий индекс:</strong> {{ wallet_health.index }}</p>
-                                            <p><strong>Курс LTC:</strong> ${{ "%.2f"|format(ltc_rate) }}</p>
+                                            <p><strong>Кошелек LTC:</strong></p>
+                                            <p><strong>Курс LTC:</strong></p>
+                                            <p><strong>Последнее обновление:</strong></p>
                                         </div>
                                         <div class="col-6">
-                                            <div class="d-grid gap-2">
-                                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#generateAddressModal">
-                                                    Сгенерировать адрес
-                                                </button>
-                                                <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#walletBackupModal">
-                                                    Создать backup
-                                                </button>
-                                                <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#recoverWalletModal">
-                                                    Восстановить кошелек
-                                                </button>
-                                            </div>
+                                            <p>
+                                                <span class="status-indicator status-{{ 'online' if wallet_status.healthy else 'offline' }}"></span>
+                                                {{ 'Работает' if wallet_status.healthy else 'Ошибка' }}
+                                            </p>
+                                            <p>${{ "%.2f"|format(ltc_rate) }}</p>
+                                            <p>{{ last_update.strftime('%Y-%m-%d %H:%M:%S') }}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -151,79 +167,94 @@
                         <div class="col-md-6">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5>Настройки API эксплореров</h5>
+                                    <h5>Действия</h5>
                                 </div>
                                 <div class="card-body">
-                                    <form method="POST" action="/admin/payment-system/api-config">
-                                        <div class="mb-3">
-                                            <label class="form-label">Blockchair API Key</label>
-                                            <input type="text" class="form-control" name="blockchair_key" 
-                                                   value="{{ api_config.blockchair_key }}">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Nownodes API Key</label>
-                                            <input type="text" class="form-control" name="nownodes_key" 
-                                                   value="{{ api_config.nownodes_key }}">
-                                        </div>
-                                        <button type="submit" class="btn btn-success">Сохранить настройки</button>
-                                    </form>
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#generateAddressModal">
+                                            <i class="bi bi-wallet2 me-1"></i> Сгенерировать адрес
+                                        </button>
+                                        <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#walletBackupModal">
+                                            <i class="bi bi-cloud-arrow-down me-1"></i> Создать backup
+                                        </button>
+                                        <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#recoverWalletModal">
+                                            <i class="bi bi-cloud-arrow-up me-1"></i> Восстановить кошелек
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="refreshSystemStatus()">
+                                            <i class="bi bi-arrow-clockwise me-1"></i> Обновить статус
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
                     <!-- Статистика API -->
-                    <div class="row">
+                    <div class="row mt-4">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header">
-                                    <h5>Статистика использования API</h5>
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5>Статус API сервисов</h5>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="testAllServices()">
+                                        <i class="bi bi-play-circle me-1"></i> Тест всех сервисов
+                                    </button>
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive">
                                         <table class="table table-sm">
                                             <thead>
                                                 <tr>
-                                                    <th>Эксплорер</th>
-                                                    <th>Всего запросов</th>
-                                                    <th>Успешных</th>
-                                                    <th>Осталось сегодня</th>
-                                                    <th>Лимит/день</th>
-                                                    <th>Последнее использование</th>
+                                                    <th>Сервис</th>
                                                     <th>Статус</th>
+                                                    <th>Запросов сегодня</th>
+                                                    <th>Лимит/день</th>
+                                                    <th>Осталось</th>
+                                                    <th>Успешных</th>
+                                                    <th>Время ответа</th>
+                                                    <th>Последняя проверка</th>
                                                     <th>Действия</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {% for stat in api_stats %}
+                                                {% for service in api_services %}
                                                 <tr>
-                                                    <td>{{ stat.explorer_name }}</td>
-                                                    <td>{{ stat.total_requests }}</td>
-                                                    <td>{{ stat.successful_requests }}</td>
-                                                    <td>{{ stat.remaining_daily_requests }}</td>
-                                                    <td>{{ stat.daily_limit }}</td>
-                                                    <td>{{ stat.last_used.strftime('%Y-%m-%d %H:%M') if stat.last_used else 'Никогда' }}</td>
+                                                    <td>{{ service.name }}</td>
                                                     <td>
-                                                        {% set ratio = stat.successful_requests / stat.total_requests if stat.total_requests > 0 else 1 %}
-                                                        <span class="{% if ratio >= 0.9 %}status-healthy{% elif ratio >= 0.7 %}status-warning{% else %}status-danger{% endif %}">
-                                                            {% if ratio >= 0.9 %}Отлично
-                                                            {% elif ratio >= 0.7 %}Нормально
-                                                            {% else %}Проблемы{% endif %}
-                                                        </span>
+                                                        <span class="status-indicator status-{{ 'online' if service.online else 'offline' }}"></span>
+                                                        {{ 'Online' if service.online else 'Offline' }}
+                                                    </td>
+                                                    <td>{{ service.requests_today }}</td>
+                                                    <td>{{ service.daily_limit }}</td>
+                                                    <td>
+                                                        <div class="progress">
+                                                            {% set percent = (service.remaining_requests / service.daily_limit * 100) if service.daily_limit > 0 else 0 %}
+                                                            <div class="progress-bar {{ 'bg-success' if percent > 20 else 'bg-warning' if percent > 5 else 'bg-danger' }}" 
+                                                                 role="progressbar" 
+                                                                 style="width: {{ percent }}%"
+                                                                 aria-valuenow="{{ service.remaining_requests }}" 
+                                                                 aria-valuemin="0" 
+                                                                 aria-valuemax="{{ service.daily_limit }}">
+                                                            </div>
+                                                        </div>
+                                                        <small>{{ service.remaining_requests }} ({{ "%.1f"|format(percent) }}%)</small>
                                                     </td>
                                                     <td>
+                                                        {% set success_rate = (service.successful_requests / service.requests_today * 100) if service.requests_today > 0 else 100 %}
+                                                        {{ "%.1f"|format(success_rate) }}%
+                                                    </td>
+                                                    <td>{{ service.response_time }} ms</td>
+                                                    <td>{{ service.last_checked.strftime('%Y-%m-%d %H:%M') if service.last_checked else 'Никогда' }}</td>
+                                                    <td>
                                                         <button class="btn btn-sm btn-outline-primary" 
-                                                                data-bs-toggle="modal" 
-                                                                data-bs-target="#testExplorerModal"
-                                                                data-explorer="{{ stat.explorer_name }}">
-                                                            Тест
+                                                                onclick="testService('{{ service.name }}')">
+                                                            <i class="bi bi-play-circle"></i> Тест
                                                         </button>
                                                         <button class="btn btn-sm btn-outline-secondary" 
                                                                 data-bs-toggle="modal" 
                                                                 data-bs-target="#configExplorerModal"
-                                                                data-explorer="{{ stat.explorer_name }}"
-                                                                data-limit="{{ stat.daily_limit }}">
-                                                            Настройки
+                                                                data-explorer="{{ service.name }}"
+                                                                data-limit="{{ service.daily_limit }}">
+                                                            <i class="bi bi-gear"></i> Лимиты
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -237,13 +268,13 @@
                     </div>
                     
                     <!-- История адресов -->
-                    <div class="row">
+                    <div class="row mt-4">
                         <div class="col-12">
                             <div class="card">
-                                <div class="card-header">
+                                <div class="card-header d-flex justify-content-between align-items-center">
                                     <h5>Последние сгенерированные адреса</h5>
                                     <a href="/admin/payment-system/export-addresses" class="btn btn-sm btn-outline-success">
-                                        Экспорт в CSV
+                                        <i class="bi bi-download me-1"></i> Экспорт в CSV
                                     </a>
                                 </div>
                                 <div class="card-body">
@@ -270,25 +301,27 @@
                                                     <td>{{ address.transaction_count or '0' }}</td>
                                                     <td>{{ address.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                                     <td>
-                                                        <button class="btn btn-sm btn-outline-primary" 
-                                                                data-bs-toggle="modal" 
-                                                                data-bs-target="#qrModal"
-                                                                data-address="{{ address.address }}">
-                                                            QR код
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-info" 
-                                                                data-bs-toggle="modal" 
-                                                                data-bs-target="#checkBalanceModal"
-                                                                data-address="{{ address.address }}">
-                                                            Проверить баланс
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-warning" 
-                                                                data-bs-toggle="modal" 
-                                                                data-bs-target="#updateAddressModal"
-                                                                data-address="{{ address.address }}"
-                                                                data-label="{{ address.label or '' }}">
-                                                            Изменить
-                                                        </button>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button class="btn btn-outline-primary" 
+                                                                    data-bs-toggle="modal" 
+                                                                    data-bs-target="#qrModal"
+                                                                    data-address="{{ address.address }}">
+                                                                <i class="bi bi-qr-code"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-info" 
+                                                                    data-bs-toggle="modal" 
+                                                                    data-bs-target="#checkBalanceModal"
+                                                                    data-address="{{ address.address }}">
+                                                                <i class="bi bi-currency-exchange"></i>
+                                                            </button>
+                                                            <button class="btn btn-outline-warning" 
+                                                                    data-bs-toggle="modal" 
+                                                                    data-bs-target="#updateAddressModal"
+                                                                    data-address="{{ address.address }}"
+                                                                    data-label="{{ address.label or '' }}">
+                                                                <i class="bi bi-pencil"></i>
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                                 {% endfor %}
@@ -305,194 +338,24 @@
     </div>
 
     <!-- Модальные окна -->
-    <!-- Модальное окно генерации адреса -->
-    <div class="modal fade" id="generateAddressModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Генерация LTC адреса</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" action="/admin/payment-system/generate-address">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Индекс (опционально)</label>
-                            <input type="number" class="form-control" name="index" 
-                                   placeholder="Оставьте пустым для автоматического индекса">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Метка адреса (опционально)</label>
-                            <input type="text" class="form-control" name="label" 
-                                   placeholder="Для удобства идентификации">
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary">Сгенерировать</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно резервного копирования -->
-    <div class="modal fade" id="walletBackupModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Резервное копирование кошелька</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" action="/admin/payment-system/create-backup">
-                    <div class="modal-body">
-                        <div class="alert alert-warning">
-                            <strong>Внимание!</strong> Резервная копия содержит чувствительные данные. 
-                            Храните ее в безопасном месте.
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Пароль для шифрования</label>
-                            <input type="password" class="form-control" name="password" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Подтверждение пароля</label>
-                            <input type="password" class="form-control" name="password_confirm" required>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary">Создать backup</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно восстановления -->
-    <div class="modal fade" id="recoverWalletModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Восстановление кошелька</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" action="/admin/payment-system/recover-wallet" enctype="multipart/form-data">
-                    <div class="modal-body">
-                        <div class="alert alert-danger">
-                            <strong>Внимание!</strong> Восстановление кошелька перезапишет текущие данные. 
-                            Убедитесь, что у вас есть резервная копия.
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Файл резервной копии</label>
-                            <input type="file" class="form-control" name="backup_file" accept=".json,.enc" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Пароль от резервной копии</label>
-                            <input type="password" class="form-control" name="password" required>
-                        </div>
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" name="overwrite" id="overwriteCheck">
-                            <label class="form-check-label" for="overwriteCheck">Перезаписать существующие данные</label>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary">Восстановить</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно QR кода -->
-    <div class="modal fade" id="qrModal" tabindex="-1">
-        <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">QR код адреса</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <!-- QR код будет вставлен через JavaScript -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно проверки баланса -->
-    <div class="modal fade" id="checkBalanceModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Проверка баланса</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- Контент будет обновлен через JavaScript -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно изменения адреса -->
-    <div class="modal fade" id="updateAddressModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Изменение адреса</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" action="">
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">Метка адреса</label>
-                            <input type="text" class="form-control" name="label" 
-                                   placeholder="Для удобства идентификации">
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary">Сохранить</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно тестирования эксплорера -->
-    <div class="modal fade" id="testExplorerModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Тестирование эксплорера</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <!-- Контент будет обновлен через JavaScript -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно настройки эксплорера -->
+    <!-- Модальное окно настройки лимитов эксплорера -->
     <div class="modal fade" id="configExplorerModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Настройка эксплорера</h5>
+                    <h5 class="modal-title">Настройка лимитов для <span id="explorerName"></span></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="">
+                <form method="POST" action="/admin/payment-system/update-explorer/">
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">Лимит запросов в день</label>
                             <input type="number" class="form-control" name="daily_limit" 
                                    placeholder="Максимальное количество запросов в день" required>
+                            <div class="form-text">
+                                Реальные лимиты API: 
+                                <span id="realLimits"></span>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -504,87 +367,57 @@
         </div>
     </div>
 
+    <!-- JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Обработчики для модальных окон
-        var qrModal = document.getElementById('qrModal');
-        qrModal.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var address = button.getAttribute('data-address');
-            var modalBody = qrModal.querySelector('.modal-body');
-            modalBody.innerHTML = '<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + 
-                                  encodeURIComponent('litecoin:' + address) + '" alt="QR Code" class="qr-code">';
-        });
-
-        var checkBalanceModal = document.getElementById('checkBalanceModal');
-        checkBalanceModal.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var address = button.getAttribute('data-address');
-            var modalBody = checkBalanceModal.querySelector('.modal-body');
-            modalBody.innerHTML = '<p>Проверка баланса для адреса: <code>' + address + '</code></p>' +
-                                 '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
-            
-            // Отправляем запрос на проверку баланса
-            fetch('/admin/payment-system/check-balance?address=' + encodeURIComponent(address))
+        // Реальные лимиты API из поиска
+        const REAL_API_LIMITS = {
+            'blockchair': '30/мин (бесплатно), до 10,000/мин (платно)',
+            'nownodes': '100,000/день (базовый), 1M+/день (премиум)',
+            'sochain': '864,000/день (10/сек)',
+            'binance': '6,000/мин (100/сек)',
+            'okx': '3,000/мин (50/сек)',
+            'coingecko': '50/мин (бесплатно)',
+            'kraken': '60/мин (бесплатно)'
+        };
+        
+        function refreshSystemStatus() {
+            fetch('/admin/payment-system/refresh-status')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        modalBody.innerHTML = '<p>Адрес: <code>' + address + '</code></p>' +
-                                            '<p>Баланс: ' + data.balance + ' LTC</p>' +
-                                            '<p>Транзакций: ' + data.transaction_count + '</p>';
+                        location.reload();
                     } else {
-                        modalBody.innerHTML = '<p>Ошибка при проверке баланса: ' + data.error + '</p>';
+                        alert('Ошибка обновления статуса: ' + data.message);
                     }
-                })
-                .catch(error => {
-                    modalBody.innerHTML = '<p>Ошибка при проверке баланса: ' + error + '</p>';
                 });
-        });
-
-        var updateAddressModal = document.getElementById('updateAddressModal');
-        updateAddressModal.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var address = button.getAttribute('data-address');
-            var label = button.getAttribute('data-label');
-            
-            var modalForm = updateAddressModal.querySelector('form');
-            modalForm.action = '/admin/payment-system/update-address/' + encodeURIComponent(address);
-            
-            var labelInput = updateAddressModal.querySelector('input[name="label"]');
-            labelInput.value = label;
-        });
-
-        var testExplorerModal = document.getElementById('testExplorerModal');
-        testExplorerModal.addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            var explorer = button.getAttribute('data-explorer');
-            
-            var modalBody = testExplorerModal.querySelector('.modal-body');
-            modalBody.innerHTML = '<p>Тестирование эксплорера: <strong>' + explorer + '</strong></p>' +
-                                 '<p>Тестовый адрес: <code>LVg2kJS4J6W6G2L6W6G2L6W6G2L6W6G2L6</code></p>' +
-                                 '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
-            
-            // Отправляем запрос на тестирование эксплорера
-            fetch('/admin/payment-system/test-explorer?explorer=' + encodeURIComponent(explorer))
+        }
+        
+        function testService(serviceName) {
+            fetch('/admin/payment-system/test-service?service=' + encodeURIComponent(serviceName))
                 .then(response => response.json())
                 .then(data => {
+                    alert(data.message);
                     if (data.success) {
-                        modalBody.innerHTML = '<p>Эксплорер: <strong>' + explorer + '</strong></p>' +
-                                            '<p>Статус: <span class="text-success">Работает</span></p>' +
-                                            '<p>Время ответа: ' + data.response_time + ' мс</p>' +
-                                            '<p>Баланс: ' + data.balance + ' LTC</p>' +
-                                            '<p>Транзакций: ' + data.transaction_count + '</p>';
-                    } else {
-                        modalBody.innerHTML = '<p>Эксплорер: <strong>' + explorer + '</strong></p>' +
-                                            '<p>Статус: <span class="text-danger">Ошибка</span></p>' +
-                                            '<p>Ошибка: ' + data.error + '</p>';
+                        setTimeout(() => location.reload(), 1000);
                     }
-                })
-                .catch(error => {
-                    modalBody.innerHTML = '<p>Ошибка при тестировании: ' + error + '</p>';
                 });
-        });
-
+        }
+        
+        function testAllServices() {
+            if (confirm('Запустить тестирование всех сервисов? Это может занять несколько секунд.')) {
+                fetch('/admin/payment-system/test-all-services')
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        if (data.success) {
+                            setTimeout(() => location.reload(), 2000);
+                        }
+                    });
+            }
+        }
+        
+        // Обработчик для модального окна настройки лимитов
         var configExplorerModal = document.getElementById('configExplorerModal');
         configExplorerModal.addEventListener('show.bs.modal', function (event) {
             var button = event.relatedTarget;
@@ -596,7 +429,16 @@
             
             var limitInput = configExplorerModal.querySelector('input[name="daily_limit"]');
             limitInput.value = limit;
+            
+            var explorerName = configExplorerModal.querySelector('#explorerName');
+            explorerName.textContent = explorer;
+            
+            var realLimits = configExplorerModal.querySelector('#realLimits');
+            realLimits.textContent = REAL_API_LIMITS[explorer] || 'Неизвестно';
         });
+        
+        // Автоматическое обновление статуса каждые 5 минут
+        setInterval(refreshSystemStatus, 300000);
     </script>
 </body>
-  </html>
+    </html>
