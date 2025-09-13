@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Users - Admin Panel</title>
+    <title>Пользователи - Панель администратора</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -125,30 +125,30 @@
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Username</th>
-                                    <th>First Name</th>
-                                    <th>Orders</th>
-                                    <th>Balance</th>
-                                    <th>Discount</th>
-                                    <th>Status</th>
-                                    <th>Registered</th>
-                                    <th>Actions</th>
+                                    <th>Имя пользователя</th>
+                                    <th>Имя</th>
+                                    <th>Заказы</th>
+                                    <th>Баланс</th>
+                                    <th>Скидка</th>
+                                    <th>Статус</th>
+                                    <th>Регистрация</th>
+                                    <th>Действия</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for user in users %}
                                 <tr>
                                     <td>{{ user.user_id }}</td>
-                                    <td>{{ user.username or 'N/A' }}</td>
-                                    <td>{{ user.first_name or 'N/A' }}</td>
+                                    <td>{{ user.username or 'Н/Д' }}</td>
+                                    <td>{{ user.first_name or 'Н/Д' }}</td>
                                     <td>{{ user.purchase_count }}</td>
                                     <td>${{ "%.2f"|format(user.balance) }}</td>
                                     <td>{{ user.discount }}%</td>
                                     <td>
                                         {% if user.ban_until %}
-                                        <span class="badge bg-danger">Banned</span>
+                                        <span class="badge bg-danger">Заблокирован</span>
                                         {% else %}
-                                        <span class="badge bg-success">Active</span>
+                                        <span class="badge bg-success">Активен</span>
                                         {% endif %}
                                     </td>
                                     <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
@@ -156,20 +156,24 @@
                                         <div class="btn-group">
                                             {% if user.ban_until %}
                                             <form action="/admin/users/{{ user.user_id }}/unban" method="post">
-                                                <button type="submit" class="btn btn-sm btn-success">Unban</button>
+                                                <button type="submit" class="btn btn-sm btn-success">Разблокировать</button>
                                             </form>
                                             {% else %}
                                             <form action="/admin/users/{{ user.user_id }}/ban" method="post">
-                                                <button type="submit" class="btn btn-sm btn-warning">Ban</button>
+                                                <button type="submit" class="btn btn-sm btn-warning">Заблокировать</button>
                                             </form>
                                             {% endif %}
                                             
                                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#balanceModal{{ user.user_id }}">
-                                                Balance
+                                                Баланс
                                             </button>
                                             
                                             <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#discountModal{{ user.user_id }}">
-                                                Discount
+                                                Скидка
+                                            </button>
+                                            
+                                            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ user.user_id }}">
+                                                Удалить
                                             </button>
                                         </div>
 
@@ -178,23 +182,23 @@
                                             <div class="modal-dialog">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title">Change Balance</h5>
+                                                        <h5 class="modal-title">Изменение баланса</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                     </div>
                                                     <form action="/admin/users/{{ user.user_id }}/balance" method="post">
                                                         <div class="modal-body">
                                                             <div class="mb-3">
-                                                                <label class="form-label">Current Balance: ${{ "%.2f"|format(user.balance) }}</label>
-                                                                <input type="number" step="0.01" class="form-control" name="amount" required placeholder="Amount">
+                                                                <label class="form-label">Текущий баланс: ${{ "%.2f"|format(user.balance) }}</label>
+                                                                <input type="number" step="0.01" class="form-control" name="amount" required placeholder="Сумма">
                                                                 <div class="form-check mt-2">
                                                                     <input class="form-check-input" type="checkbox" name="is_subtract" id="subtract{{ user.user_id }}">
-                                                                    <label class="form-check-label" for="subtract{{ user.user_id }}">Subtract from balance</label>
+                                                                    <label class="form-check-label" for="subtract{{ user.user_id }}">Вычесть из баланса</label>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                         <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="submit" class="btn btn-primary">Save</button>
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                                            <button type="submit" class="btn btn-primary">Сохранить</button>
                                                         </div>
                                                     </form>
                                                 </div>
@@ -206,23 +210,45 @@
                                             <div class="modal-dialog">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title">Change Discount</h5>
+                                                        <h5 class="modal-title">Изменение скидки</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                     </div>
                                                     <form action="/admin/users/{{ user.user_id }}/discount" method="post">
                                                         <div class="modal-body">
                                                             <div class="mb-3">
-                                                                <label class="form-label">Current Discount: {{ user.discount }}%</label>
-                                                                <input type="number" class="form-control" name="discount" required min="0" max="100" placeholder="Discount %">
+                                                                <label class="form-label">Текущая скидка: {{ user.discount }}%</label>
+                                                                <input type="number" class="form-control" name="discount" required min="0" max="100" placeholder="Скидка %">
                                                             </div>
                                                             <div class="form-check">
                                                                 <input class="form-check-input" type="checkbox" name="is_temporary" id="temp{{ user.user_id }}">
-                                                                <label class="form-check-label" for="temp{{ user.user_id }}">Temporary discount (24 hours)</label>
+                                                                <label class="form-check-label" for="temp{{ user.user_id }}">Временная скидка (24 часа)</label>
                                                             </div>
                                                         </div>
                                                         <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="submit" class="btn btn-primary">Save</button>
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                                            <button type="submit" class="btn btn-primary">Сохранить</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Modal for delete -->
+                                        <div class="modal fade" id="deleteModal{{ user.user_id }}" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Подтверждение удаления</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <form action="/admin/users/{{ user.user_id }}/delete" method="post">
+                                                        <div class="modal-body">
+                                                            <p>Вы уверены, что хотите полностью удалить пользователя {{ user.first_name }} ({{ user.user_id }})?</p>
+                                                            <p class="text-danger">Это действие невозможно отменить! Будут удалены все данные пользователя, включая историю заказов и транзакций.</p>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                                            <button type="submit" class="btn btn-danger">Полное удаление</button>
                                                         </div>
                                                     </form>
                                                 </div>
