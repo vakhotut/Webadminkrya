@@ -183,10 +183,10 @@ async def ban_user(request):
                 ban_until, user_id
             )
         
-        return web.HTTPFound('/admin/users?message=User banned successfully')
+        return web.HTTPFound('/admin/users?message=Пользователь заблокирован')
     except Exception as e:
         logger.error(f"Error banning user {user_id}: {e}")
-        return web.HTTPFound('/admin/users?error=Error banning user')
+        return web.HTTPFound('/admin/users?error=Ошибка при блокировке пользователя')
 
 @users_routes.post('/admin/users/{user_id}/unban')
 async def unban_user(request):
@@ -200,10 +200,10 @@ async def unban_user(request):
                 user_id
             )
         
-        return web.HTTPFound('/admin/users?message=User unbanned successfully')
+        return web.HTTPFound('/admin/users?message=Пользователь разблокирован')
     except Exception as e:
         logger.error(f"Error unbanning user {user_id}: {e}")
-        return web.HTTPFound('/admin/users?error=Error unbanning user')
+        return web.HTTPFound('/admin/users?error=Ошибка при разблокировке пользователя')
 
 @users_routes.post('/admin/users/{user_id}/balance')
 async def change_balance(request):
@@ -227,11 +227,11 @@ async def change_balance(request):
                     amount, user_id
                 )
         
-        action = "subtracted from" if is_subtract else "added to"
-        return web.HTTPFound(f'/admin/users?message=${amount} {action} balance successfully')
+        action = "вычтена из" if is_subtract else "добавлена к"
+        return web.HTTPFound(f'/admin/users?message=${amount} {action} балансу пользователя')
     except Exception as e:
         logger.error(f"Error changing balance for user {user_id}: {e}")
-        return web.HTTPFound('/admin/users?error=Error changing balance')
+        return web.HTTPFound('/admin/users?error=Ошибка при изменении баланса')
 
 @users_routes.post('/admin/users/{user_id}/discount')
 async def change_discount(request):
@@ -258,8 +258,27 @@ async def change_discount(request):
                     discount, user_id
                 )
         
-        discount_type = "temporary" if is_temporary else "permanent"
-        return web.HTTPFound(f'/admin/users?message={discount_type.capitalize()} discount set to {discount}% successfully')
+        discount_type = "временная" if is_temporary else "постоянная"
+        return web.HTTPFound(f'/admin/users?message={discount_type.capitalize()} скидка установлена на {discount}%')
     except Exception as e:
         logger.error(f"Error changing discount for user {user_id}: {e}")
-        return web.HTTPFound('/admin/users?error=Error changing discount')
+        return web.HTTPFound('/admin/users?error=Ошибка при изменении скидки')
+
+@users_routes.post('/admin/users/{user_id}/delete')
+async def delete_user(request):
+    user_id = int(request.match_info['user_id'])
+    db_pool = request.app['db_pool']
+    
+    try:
+        async with db_pool.acquire() as conn:
+            # Удаляем связанные данные пользователя
+            await conn.execute('DELETE FROM transactions WHERE user_id = $1', user_id)
+            await conn.execute('DELETE FROM purchases WHERE user_id = $1', user_id)
+            
+            # Удаляем самого пользователя
+            await conn.execute('DELETE FROM users WHERE user_id = $1', user_id)
+        
+        return web.HTTPFound('/admin/users?message=Пользователь полностью удален')
+    except Exception as e:
+        logger.error(f"Error deleting user {user_id}: {e}")
+        return web.HTTPFound('/admin/users?error=Ошибка при удалении пользователя')
